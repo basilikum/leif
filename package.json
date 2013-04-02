@@ -1,0 +1,18 @@
+{
+  "name": "leif",
+  "version": "0.0.0",
+  "description": "A template engine for node",
+  "author": {
+    "name": "Bastian Krüger",
+    "email": "dev.basilikum@gmail.com"
+  },
+   "repository": {
+    "type": "git",
+    "url": "https://github.com/basilikum/leif"
+  }, 
+  "main": "./leif.js",
+  "engines": {
+    "node": "*"
+  },
+  "readmeFilename": "README.md"
+}
