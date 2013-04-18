@@ -1,145 +1,144 @@
-var fs = require("fs");
+module.exports = (function (that) {
 
+	var helper = require("./leif.helper.js");
+	var functionRepository = require("./leif.repo.js");
+	var leifEval = require("./leif.eval.js");
+	var fullFunctionRepository = functionRepository;
 
+	that.setUserRepository = function (repo) {
+		fullFunctionRepository = helper.deepMergeObjects(functionRepository, repo);
+	};
 
-var enhanceObject = function(obj, parent, grand) {
-	var res = Array.isArray(obj) ? [] : {};
-	if (typeof obj === "object") {
-		for (var i in obj) {
-			if (obj.hasOwnProperty(i)) {
-				res[i] = enhanceObject(obj[i], res, parent);
-			}
-		}
-		res.parent = Array.isArray(parent) ? grand : parent;
-	} else {
-		res.value = obj;
-		res.type = "enhanced";
-		res.parent = Array.isArray(parent) ? grand : parent;
-	}
-	return res;
-};
+	var interpretFunctionArguments = function (args, context, vmcontext) {
+		var evaluatedArgs = [],
+			arg,
+			evalResult,
+			i, max_i;
 
-var iterpretEquation = function(equation, context) {
-	var equ = equation.replace("@","context");
-
-};
-
-var parseVariable = function(obj, context) {
-	var value = obj.value,
-		up = obj.up || 0,
-		res;
-	if (typeof value !== "undefined") {
-
-		while (up > 0) {
-			context = context.parent;
-			up--;
-		}
-
-		if (value === ".") {
-			return context.toString();
-		} else if (typeof (res = context[value]) !== "undefined") {
-			if (res.type === "enhanced") {
-				return res.value.toString();
+		for (i = 0, max_i = args.length; i < max_i; i++) {
+			arg = args[i];
+			if (typeof arg === "object" && arg.type === "eval") {
+				evaluatedArgs.push(tryEvaluate(arg.content, context, vmcontext).result);
 			} else {
-				return res.toString();
+				evaluatedArgs.push(arg);
 			}
+		}
+
+		return evaluatedArgs;
+	};
+
+	var interpretErrorMessage = function (obj, context, vmcontext) {
+		return "";
+	};
+
+
+	var interpretFunction = function (obj, context, vmcontext) {
+		var args,
+			funcResult,
+			body;
+
+		args = interpretFunctionArguments(obj.args, context, vmcontext);
+		body = interpretArray(obj.body, context, vmcontext).join("");
+		funcResult = obj.func.apply(this, args).replace("<<body>>", body);
+		return funcResult;
+	};
+
+	var interpretEvalStatement = function (obj, context, vmcontext) {
+
+		var evalResult = tryEvaluate(obj.content, context, vmcontext);
+		return evalResult.evaluated ? evalResult.result : "";
+	};
+
+	var interpretIfStatement = function (obj, context, vmcontext) {
+		var evalResult;
+
+		evalResult = tryEvaluate(obj.condition, context, vmcontext);
+		if (evalResult.evaluated && evalResult.result) {
+			return interpretArray(obj.body, context, vmcontext).join("");
 		} else {
-			return null;
+			return "";
 		}
-	} else {
-		return null;
-	}
-};
-
-var parseFunction = function(obj, context) {
-	var func = obj.func,
-		args = obj.args;
-	if (typeof func === "function") {
-		args = parseArray(args, context);
-		var res = func(args);
-		var body = obj.body;
-		if (typeof body === "object") {
-			var parseBody = parseArray(body, context);
-			res = res.replace("<<body>>", parseBody);
-		}
-		return res;
-	} else {
-		return "<<function not defined>>";
-	}
-};
-
-var parseInline = function(obj, context) {
-	var func = obj.func,
-		args = obj.args;
-	if (typeof func === "function") {
-		args = parseArray(args, context);
-		var res = func(args);
-		return res;
-	} else {
-		return "<<function not defined>>";
-	}
-};
+	};
 
 
-var parseForEach = function(obj, context) {
-	var item = obj.item,
-		up = obj.up || 0,
-		res;
+	var interpretForeachStatement = function (obj, context, vmcontext) {
+		var evalResult, key, subKey, item, subItem,
+			resultArray = [],
+			newContext;
 
-	if (typeof item !== "undefined") {
-
-		while (up > 0) {
-			context = context.parent;
-			up--;
-		}
-
-		if (typeof (res = context[item]) !== "undefined") {
-			var out = [];
-			for (var i = 0, max_i = res.length; i < max_i; i++) {
-				out.push(parseArray(obj.body, res[i]).join(""));
-			}
-			return out.join("");
-		} else {
-			return null;
-		}
-	} else {
-		return null;
-	}
-};
-
-var parseObject = {
-	variable: parseVariable,
-	func: parseFunction,
-	inline: parseInline,
-	foreach: parseForEach
-};
-
-var parseArray = function(arr, context) {
-	var res = [];
-	for (var i = 0, max_i = arr.length; i < max_i; i++) {
-		var obj = arr[i];
-		if (typeof obj === "string") {
-			res.push(obj);
-		} else {
-			var type = obj.type;
-			if (typeof type !== "undefined") {
-				var func = parseObject[type];
-				if (typeof func === "function") {
-					res.push(parseObject[type](obj, context));
-				} else {
-					return "<<type not defined>>";
+		evalResult = tryEvaluate(obj.value, context, vmcontext);
+		if (evalResult.evaluated) {
+			for (key in evalResult.result) {
+				if (evalResult.result.hasOwnProperty(key)) {
+					newContext = {};
+					item = evalResult.result[key];
+					for (subKey in item) {
+						if (item.hasOwnProperty(subKey)) {
+							newContext[subKey] = item[subKey];
+						}
+					}
+					newContext.$p = context;
+					resultArray = resultArray.concat(interpretArray(obj.body, newContext, leifEval.createContext(helper.mergeObjects(newContext, fullFunctionRepository))));
 				}
+			}
+			return resultArray.join("");
+		} else {
+			return "";
+		}
+	};
+
+	var tryEvaluate = function (content, context, vmcontext) {
+		var evalResult;
+
+		try
+		{
+			evalResult = vmcontext.evaluate(content);
+			return {
+				evaluated: true,
+				result: evalResult
+			};
+		}
+		catch (e)
+		{
+			return {
+				evaluated: false,
+				result: null
+			};
+		}
+	};
+
+	var interpreter = {
+		"eval": interpretEvalStatement,
+		"func": interpretFunction,
+		"foreach": interpretForeachStatement,
+		"if":  interpretIfStatement,
+		"error": interpretErrorMessage
+	};
+
+	var interpretArray = function (arr, context, vmcontext) {
+		var result = [],
+			obj, i, max_i;
+
+		for (i = 0, max_i = arr.length; i < max_i; i++) {
+			obj = arr[i];
+			if (typeof obj === "string") {
+				result.push(obj);
 			} else {
-				return "<<type undefined>>";
+				result.push(interpreter[obj.type](obj, context, vmcontext));
 			}
 		}
-	}
-	return res;
-};
+		return result;
+	};
 
-var produceHTML = function(arr, context) {
-	var res = parseArray(arr, enhanceObject(context)).join("");
-	return res;
-};
 
-module.exports.produceHTML = produceHTML;
+	that.produceHTML = function (arr, context) {
+		var res = interpretArray(arr, context, leifEval.createContext(helper.mergeObjects(context, fullFunctionRepository))).join("");
+		return res;
+	};
+
+	return that;
+
+}({}));
+
+
+

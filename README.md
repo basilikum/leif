@@ -11,8 +11,8 @@ This project is still in very early development and so far it only supports a co
     	</head>
     	<body>
     		<div>
-    			f:htmlHelper.span(name) {
-    				<a href="f:get(link)"></a>
+    			$:html.span(name) {
+    				<a href="$:(link)"></a>
     			}           
     		</div>           
     	</body>   
@@ -26,20 +26,14 @@ After compiling:
     		type: "func",
     		func: span,
     		args: [{
-    			type: "var",
-    			value: "name",
-    			up: 0
+    			type: "eval",
+    			content: "name"
     		}],
     		body: [
     			"\n\t\t\t\t<a href=\"",
     			{
-    				type: "inline",
-    				func: get,
-    				args: [{
-    					type: "var",
-    					value: "link",
-    					up: 0
-    				}]
+    				type: "eval",
+    				content: "link"
     			},
     			"\"></a>"
     		]
@@ -64,19 +58,20 @@ With context = {name: "hello", link: "http://world.com"}:
 And this is how you would use it in node:
 
     var leif = require("leif");
-    var fs = require("fs");
     
-    fs.readFile("C:\\...\\intro.html", function(error, data) {
-    	if (error) {
-    		// no file error
-    	} else {
-    		var arr = leif.parseTemplate(data.toString());
-    		var context = {name: "hello", link: "http://world.com"};
-    		var html = leif.produceHTML(arr, context);
-    	}
-    });
+    leif.cacheView("C:\\...\\intro.html", function (err) {
+        var html, context;
+        if (err) {
+            //error
+        } else {
+            ....
+            context = {name: "hello", link: "http://world.com"};
+            html = leif.requestViewByPath("intro", context);
 
-Of course you would normally call the parseTemplate function only on startup or when the template has changed. Then you can produce the actual page, anytime it is needed and with different contents.
+        }
+    })
+
+
 
 
 
