@@ -72,11 +72,14 @@ module.exports = (function (that) {
 				if (evalResult.result.hasOwnProperty(key)) {
 					newContext = {};
 					item = evalResult.result[key];
-					for (subKey in item) {
-						if (item.hasOwnProperty(subKey)) {
-							newContext[subKey] = item[subKey];
+					if (typeof item === "object") {
+						for (subKey in item) {
+							if (item.hasOwnProperty(subKey)) {
+								newContext[subKey] = item[subKey];
+							}
 						}
 					}
+					newContext.$this = item.toString();
 					newContext.$p = context;
 					resultArray = resultArray.concat(interpretArray(obj.body, newContext, leifEval.createContext(helper.mergeObjects(newContext, fullFunctionRepository))));
 				}
@@ -132,6 +135,7 @@ module.exports = (function (that) {
 
 
 	that.produceHTML = function (arr, context) {
+		context.$this = context.toString();
 		var res = interpretArray(arr, context, leifEval.createContext(helper.mergeObjects(context, fullFunctionRepository))).join("");
 		return res;
 	};
