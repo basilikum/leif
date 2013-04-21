@@ -7,10 +7,10 @@ var leif = (function(that){
 		views = {};
 
 
-	that.overrideExistingViews = false;
-	that.throwErrorOnOverrideExistingViews = true;
-	that.returnFirstViewOnMultipleMatches = false;
-	that.standardViewPathDelimiter = ".";
+	that.overrideExistingTemplates = false;
+	that.throwErrorOnOverrideExistingTemplates = true;
+	that.returnFirstTemplateOnMultipleMatches = false;
+	that.standardTemplatePathDelimiter = ".";
 
 	var searchObject = function (obj, searchKey) {
 		var result = [],
@@ -35,16 +35,16 @@ var leif = (function(that){
 		interpreter.setUserRepository(repo);
 	};
 
-	that.requestViewByName = function (name, context) {
+	that.requestTemplateByName = function (name, context) {
 		var foundViews = searchObject(views, name);
-		if (foundViews.length === 0 || (foundViews.length > 1 && !that.returnFirstViewOnMultipleMatches)) {
+		if (foundViews.length === 0 || (foundViews.length > 1 && !that.returnFirstTemplateOnMultipleMatches)) {
 			return null;
 		} else {
 			return interpreter.produceHTML(foundViews[0], context);
 		}
 	};
 
-	that.requestViewByFile = function (file, context, callback) {
+	that.requestTemplateByFile = function (file, context, callback) {
 		fs.readFile(file, function(error, data) {
 			var arr;
 			if (error) {
@@ -56,7 +56,7 @@ var leif = (function(that){
 		});
 	};
 
-	that.requestViewByFileSync = function (file, context) {
+	that.requestTemplateByFileSync = function (file, context) {
 		var data,
 			arr;
 
@@ -65,11 +65,11 @@ var leif = (function(that){
 		return interpreter.produceHTML(arr, context);
 	};	
 
-	that.requestViewByPath = function (path, context, delimiter) {
+	that.requestTemplateByPath = function (path, context, delimiter) {
 		var parts, i, i_max, part, obj;
 
 		obj = views;
-		delimiter = (typeof delimiter === "string") ? delimiter : that.standardViewPathDelimiter;
+		delimiter = (typeof delimiter === "string") ? delimiter : that.standardTemplatePathDelimiter;
 		parts = path.split(delimiter);
 		for (i = 0, max_i = parts.length; i < max_i; i++) {
 			part = parts[i];
@@ -82,7 +82,7 @@ var leif = (function(that){
 		}
 	};
 
-	that.cacheFolderSync = function (dir, obj) {
+	that.cacheDirectorySync = function (dir, obj) {
 		var dirStat,
 			fileStat,
 			folderName,
@@ -106,14 +106,14 @@ var leif = (function(that){
 				file = dir + "/" + files[i];
 				fileStat = fs.statSync(file);
 				if (fileStat.isDirectory()) {
-					error += that.cacheFolderSync(file, obj[folderName]) || "";
+					error += that.cacheDirectorySync(file, obj[folderName]) || "";
 				} else if (fileStat.isFile()) {
 					if (path.extname(file) === ".html") {
 						data = fs.readFileSync(file);
 						viewName = path.basename(file, '.html');
-						if (that.overrideExistingViews || !obj[folderName][viewName]) {
+						if (that.overrideExistingTemplates || !obj[folderName][viewName]) {
 							obj[folderName][viewName] = parser.parse(data.toString());
-						} else if (that.throwErrorOnOverrideExistingViews) {
+						} else if (that.throwErrorOnOverrideExistingTemplates) {
 							error += "view " + dir + "/" + viewName + " is already defined\r\n";
 						}
 					}
@@ -125,7 +125,7 @@ var leif = (function(that){
 		return error === "" ? null : error;
 	};
 
-	that.cacheFolder = function (dir, callback, obj) {
+	that.cacheDirectory = function (dir, callback, obj) {
 		obj = obj || views;
 		fs.stat(dir, function (err, stats) {
 			var folderName;
@@ -155,7 +155,7 @@ var leif = (function(that){
 								if (err) {
 									incrementCounter(err);
 								} else if (stats.isDirectory()) {
-									that.cacheFolder(file, function (err) {
+									that.cacheDirectory(file, function (err) {
 										incrementCounter(err);
 									}, obj[folderName]);
 								} else if (stats.isFile()) {
@@ -166,10 +166,10 @@ var leif = (function(that){
 												incrementCounter(error);
 											} else {
 												viewName = path.basename(file, '.html');
-												if (that.overrideExistingViews || !obj[folderName][viewName]) {
+												if (that.overrideExistingTemplates || !obj[folderName][viewName]) {
 													obj[folderName][viewName] = parser.parse(data.toString());
 													incrementCounter();
-												} else if (that.throwErrorOnOverrideExistingViews) {
+												} else if (that.throwErrorOnOverrideExistingTemplates) {
 													incrementCounter("view " + dir + "/" + viewName + " is already defined\r\n");
 												} else {
 													incrementCounter();
@@ -192,19 +192,15 @@ var leif = (function(that){
 		});
 	};
 
-	that.showAllViews = function () {
-		console.log(views);
-	};
-
-	var cacheView = function (file, name, callback) {
+	var cacheTemplate = function (file, name, callback) {
 		fs.readFile(file, function (error, data) {
 			if (error) {
 				callback(error);
 			} else {
-				if (that.overrideExistingViews || !views[name]) {
+				if (that.overrideExistingTemplates || !views[name]) {
 					views[name] = parser.parse(data.toString());
 					callback();
-				} else if (that.throwErrorOnOverrideExistingViews) {
+				} else if (that.throwErrorOnOverrideExistingTemplates) {
 					callback("view " +file + " is already defined\r\n");
 				} else {
 					callback();
@@ -213,37 +209,37 @@ var leif = (function(that){
 		});	
 	};
 
-	var cacheViewSync = function (file, name) {
+	var cacheTemplateSync = function (file, name) {
 		var data;
 
 		data = fs.readFileSync(file);
-		if (that.overrideExistingViews || !views[name]) {
+		if (that.overrideExistingTemplates || !views[name]) {
 			views[name] = parser.parse(data.toString());
-		} else if (that.throwErrorOnOverrideExistingViews) {
+		} else if (that.throwErrorOnOverrideExistingTemplates) {
 			return "view " + file + " is already defined\r\n";
 		} 
 
 		return null;					
 	};	
 
-	that.cacheViewWithName = function (file, name, callback) {
-		cacheView(file, name, function (err) {
+	that.cacheTemplateWithName = function (file, name, callback) {
+		cacheTemplate(file, name, function (err) {
 			callback(err);
 		});
 	};
 
-	that.cacheView = function (file, callback) {
-		cacheView(file, path.basename(file, '.html'), function (err) {
+	that.cacheTemplate = function (file, callback) {
+		cacheTemplate(file, path.basename(file, '.html'), function (err) {
 			callback(err);
 		});
 	};
 
-	that.cacheViewWithNameSync = function (file, name) {
-		return cacheViewSync(file, name);
+	that.cacheTemplateWithNameSync = function (file, name) {
+		return cacheTemplateSync(file, name);
 	};	
 
-	that.cacheViewSync = function (file) {
-		return cacheViewSync(file, path.basename(file, '.html'));
+	that.cacheTemplateSync = function (file) {
+		return cacheTemplateSync(file, path.basename(file, '.html'));
 	};
 
 
