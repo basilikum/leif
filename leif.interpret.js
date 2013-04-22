@@ -79,7 +79,7 @@ module.exports = (function (that) {
 							}
 						}
 					}
-					newContext.$this = item.toString();
+					newContext.$this = item;
 					newContext.$p = context;
 					resultArray = resultArray.concat(interpretArray(obj.body, newContext, leifEval.createContext(helper.mergeObjects(newContext, fullFunctionRepository))));
 				}
@@ -135,7 +135,7 @@ module.exports = (function (that) {
 
 
 	that.produceHTML = function (arr, context) {
-		context.$this = context.toString();
+		context.$this = context;
 		var res = interpretArray(arr, context, leifEval.createContext(helper.mergeObjects(context, fullFunctionRepository))).join("");
 		return res;
 	};

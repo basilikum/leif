@@ -186,6 +186,62 @@ The user repository will then be merged with the built-in repository:
 
 The functions in the built-in repository are divided into functions that produce HTML strings (html) and functions that produce non-HTML strings (text). You don't have to stick to this convention. You can structure and organize your repository the way you want.
 
+Custom functions can be very useful. The following example shows how to implement nested templates with a simple custom function (to fully understand this example you probably have to read the other chapters first):
+
+    //index.html
+    <html>
+        <head>
+        </head>
+        <body>
+            <div class="header">
+            </div>
+            <div class="main-section">
+                $:insert("list", $this)
+            </div>
+        </body>
+    </html>
+
+    //list.html
+    <div class="list-container">
+        $:foreach(arr) {
+            <div class="list-item">$this</div>
+        }
+    </div>
+
+    var leif = require("leif"),
+        context = {
+            arr: ["item1", "item2", "item3"]
+        };
+
+    leif.cacheTemplateSync("index.html");
+    leif.cacheTemplateSync("list.html");
+
+    leif.setUserRepository({
+        insert: function (templateName, context) {
+            return leif.requestTemplateByName(templateName, context);
+        }
+    });
+
+    var res = leif.requestTemplateByName("index", context);
+
+    //result
+    <html>
+        <head>
+        </head>
+        <body>
+            <div class="header">
+            </div>
+            <div class="main-section">
+                <div class="list-container">
+                    <div class="list-item">item1</div>
+                    <div class="list-item">item2</div>
+                    <div class="list-item">item3</div>
+                </div>
+            </div>
+        </body>
+    </html>
+
+
 ##Context##
 
 The context object, that you use to provide the actual data for your template, is supposed to be a javascript object. Inside that object you can provide any data you want. When leif evaluates an expression, it merges your context object with the complete function repository to produce the actual evaluation context. Therefore it is necessary in your context object not to use the same identifiers that you have used in the function repository.
@@ -225,7 +281,7 @@ This will produce:
     <span name="hello">text1</span>
     <span name="hello">text2</span>
 
-The `$this` property will be attached to every context object. It returns the current context as string value. This is necessary when you have an actual string value as context. By using `$this` and a slightly different context object, the example above can be rewritten as:
+The `$this` property will be attached to every context object. It points to the current context itself. This is useful when you have an actual string value as context. By using `$this` and a slightly different context object, the example above can be rewritten as:
 
     //context
     {

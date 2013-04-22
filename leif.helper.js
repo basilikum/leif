@@ -97,7 +97,7 @@ var split = function (text, delimiter) {
 				inParentheses = false;
 			} else if (ch === delimiter && !inParentheses) {
 				arr.push(text.substring(0, i));
-				text = text.substring(i);
+				text = text.substring(i + 1);
 				i = 0;
 				max_i = text.length;
 			}
