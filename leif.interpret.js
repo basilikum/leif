@@ -28,7 +28,8 @@ module.exports = (function (that) {
 	};
 
 	var interpretErrorMessage = function (obj, context, vmcontext) {
-		return "";
+		//return "(" + obj.message + " -->)" + obj.text;
+		return obj.text;
 	};
 
 

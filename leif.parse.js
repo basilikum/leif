@@ -7,6 +7,7 @@ module.exports = (function (that) {
 	var functionalExp = /\$:/;
 	var bodyStartExp = /^\s*\{/;
 	var functionEndExp = /^\s*;/;
+	var validIdentifierExp = /^([a-zA-Z_$][0-9a-zA-Z_$.]*)?$/;
 
 	var context = leifEval.createContext(functionRepository);
 	var fullFunctionRepository = functionRepository;
@@ -165,11 +166,7 @@ module.exports = (function (that) {
 			if (typeof func === "function") {
 				return parseFunction(func, args, body);
 			} else {
-				return {
-					type: "error",
-					funcName: nameOfFunction,
-					message: "could not resolve function"
-				};
+				return new Error("could not find function with name " + nameOfFunction);
 			}
 		}
 	};
@@ -199,26 +196,61 @@ module.exports = (function (that) {
 
 			nameOfFunction = match.substring(2, openingParenthesesIndex);
 
-			args = match.substring(openingParenthesesIndex + 1, closingParenthesesIndex).trim();
-			afterMatch = match.substring(closingParenthesesIndex + 1);
-			
-			if (bodyStartExp.test(afterMatch)) {
-				openingBracketIndex = afterMatch.indexOf("{");
-				closingBracketIndex = helper.findClosingIndex(afterMatch, ["{", "}"], openingBracketIndex);
-				body = afterMatch.substring(openingBracketIndex + 1, closingBracketIndex);
-				htmlString = afterMatch.substring(closingBracketIndex + 1);
-			} else if (functionEndExp.test(afterMatch)) {
-				body = "";
-				htmlString = afterMatch.substring(afterMatch.indexOf(";") + 1);
+			if (validIdentifierExp.test(nameOfFunction)) {
+
+				if (closingParenthesesIndex > 0) {
+					args = match.substring(openingParenthesesIndex + 1, closingParenthesesIndex).trim();
+					afterMatch = match.substring(closingParenthesesIndex + 1);
+					
+					if (bodyStartExp.test(afterMatch)) {
+						openingBracketIndex = afterMatch.indexOf("{");
+						closingBracketIndex = helper.findClosingIndex(afterMatch, ["{", "}"], openingBracketIndex);
+						if (closingBracketIndex > 0) {
+							body = afterMatch.substring(openingBracketIndex + 1, closingBracketIndex);
+							htmlString = afterMatch.substring(closingBracketIndex + 1);
+						} else {
+							body = "";
+							htmlString = afterMatch;
+						}
+
+					} else if (functionEndExp.test(afterMatch)) {
+						body = "";
+						htmlString = afterMatch.substring(afterMatch.indexOf(";") + 1);
+					} else {
+						body = "";
+						htmlString = afterMatch;
+					}
+					parseFunctionResult = parseStatement(nameOfFunction, args, body);
+					if (parseFunctionResult instanceof Error) {
+						resultArray.push({
+							type: "error",
+							text: match.substring(0, 2),
+							message: parseFunctionResult.message
+							
+						});
+						htmlString = match.substring(2);
+					} else if (Array.isArray(parseFunctionResult)) {
+						resultArray = resultArray.concat(parseFunctionResult);
+					} else {
+						resultArray.push(parseFunctionResult);
+					}
+				} else {
+					resultArray.push({
+						type: "error",
+						text: match.substring(0, 2),
+						message: "no closing parentheses found"
+						
+					});
+					htmlString = match.substring(2);
+				}
 			} else {
-				body = "";
-				htmlString = afterMatch;
-			}
-			parseFunctionResult = parseStatement(nameOfFunction, args, body);
-			if (Array.isArray(parseFunctionResult)) {
-				resultArray = resultArray.concat(parseFunctionResult);
-			} else {
-				resultArray.push(parseFunctionResult);
+				resultArray.push({
+					type: "error",
+					text: match.substring(0, 2),
+					message: "not a valid expression"
+					
+				});
+				htmlString = match.substring(2);
 			}
 		
 		}

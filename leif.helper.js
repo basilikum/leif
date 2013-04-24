@@ -145,11 +145,23 @@ var compressArray = function (arr) {
 	return rslt;	
 };
 
+var getObjectLength = function (obj) {
+	var key, counter = 0;
+
+	for (key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			counter += 1;
+		}
+	}
+	return counter;
+};
+
 module.exports = {
 	compressArray: compressArray,
 	insertArrayInAnother: insertArrayInAnother,
 	split: split,
 	findClosingIndex: findClosingIndex,
 	mergeObjects: mergeObjects,
-	deepMergeObjects: deepMergeObjects
+	deepMergeObjects: deepMergeObjects,
+	getObjectLength: getObjectLength
 };
