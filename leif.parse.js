@@ -44,7 +44,7 @@ module.exports = (function (that) {
 		var evalResult;
 
 		evalResult = tryEvaluate(condition);
-		if (evalResult.evaluated) {
+		if (evalResult.evaluated && condition.indexOf("typeof ") === -1) {
 			if (evalResult.result) {
 				return parseCodeBlock(body);
 			} else {
