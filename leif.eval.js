@@ -11,7 +11,6 @@ var $ruvhdisj345u5djkfu284 = function (context) {
 			return eval(expression);
 		}
 	};
-
 };
 
 module.exports.createContext = $ruvhdisj345u5djkfu284;

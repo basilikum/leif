@@ -1,6 +1,6 @@
 {
   "name": "leif",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "A template engine for node",
   "author": {
     "name": "Bastian Krüger",
@@ -13,6 +13,9 @@
   "main": "./leif.js",
   "engines": {
     "node": "*"
+  },
+  "devDependencies": {
+    "mocha": "1.8.2"
   },
   "readmeFilename": "README.md"
 }

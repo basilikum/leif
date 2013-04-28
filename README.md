@@ -42,8 +42,11 @@ To evaluate the template you have to pass a context object, which contains the d
     
 Then you can parse and translate the template with leif in the following way:
 
-    var leif = require("leif");
-    var result = leif.requestTemplateByFileSync("C:\\...\\intro.html", context);
+    var leif = require("leif"),
+        result;
+
+    leif.registerTemplateSync("C:\\...\\intro.html");
+    result = leif.requestTemplateByPath("intro", context);
 
 As a result you get the finished html document string:
 
@@ -110,15 +113,21 @@ When you access leif functions within an evaluation, you do this without the acc
 
     $:(html.span("some argument"))
 
-This simple example would actually produce nearly the same result as the example in the "functions" block. The difference is, that it is not possible to add an optional body to your function call, when you access a function from inside an evaluation. And since inside the evaluation a function will just be evaluated, without any further checking, any `<<body>>` inside the return value will not be replaced but will remain in the result. So, to produce actually the same result as in the example above, you could manually replace the `<<body>>` parts:
+This simple example would only produce nearly the same result as the example in the "functions" block. The difference is, that it is not possible to add an optional body to your function call, when you access a function from inside an evaluation. And since inside the evaluation a function will just be evaluated, without any further checking, any `<<body>>` inside the return value will not be replaced but will remain in the result. So, to produce actually the same result as in the example above, you could manually replace the `<<body>>` parts:
 
     $:(html.span("some argument").replace("<<body>>", ""))
 
 Technically, every argument that you pass to a leif function or to a control construct, is an evaluation statement.
 
+You can use evaluation to print text that would otherwise be interpreted as leif syntax:
+
+    $:("$:")
+
+This will produce an actual dollar sign followed by a colon.
+
 ###control construct###
 
-The syntax of control constructs is the same as of functions, with the exception that control constructs always require a body. There are two different kinds of control construct in leif:
+The syntax of control constructs is the same as of function. There are two different kinds of control construct in leif:
 
 *   if
 *   foreach
@@ -213,8 +222,8 @@ Custom functions can be very useful. The following example shows how to implemen
             arr: ["item1", "item2", "item3"]
         };
 
-    leif.cacheTemplateSync("index.html");
-    leif.cacheTemplateSync("list.html");
+    leif.registerTemplateSync("index.html");
+    leif.registerTemplateSync("list.html");
 
     leif.setUserRepository({
         insert: function (templateName, context) {
@@ -296,9 +305,95 @@ The `$this` property will be attached to every context object. It points to the 
 
 The result remains the same as it was before.
 
+##Registering templates##
+
+Before you can translate a template, you need to register it. You can register single templates or complete directories of templates.
+
+    var leif = require("leif");
+
+    //single template
+    var err = leif.registerTemplateSync("C:\\...\\intro.html");
+
+    //directory
+    var err = leif.registerDirectorySync("C:\\...\\myTemplateDirectory");
+
+Registered templates will be stored internally with a "path" and a "name" identifier. 
+Consider the following folder structure in the myTemplateDirectory folder:
+
+    myTemplateDirectory
+        |
+        +-- DirA
+        |     |
+        |     +-- myView1.html
+        |     |
+        |     +-- myView2.html
+        |
+        |
+        +-- DirB
+        |     |
+        |     +-- myView3.html
+        |
+        |
+        +-- index.html
+
+After registering this directory, the internal template storage will look like this:
+
+    {
+        "myTemplateDirectory/DirA/myView1" : {
+            file: "C:\\...\\myTemplateDirectory\\DirA\\myView1.html",
+            name: myView1,
+            cache: []
+        },
+        "myTemplateDirectory/DirA/myView2" : {
+            file: "C:\\...\\myTemplateDirectory\\DirA\\myView2.html",
+            name: myView2,
+            cache: []
+        },
+        "myTemplateDirectory/DirB/myView3" : {
+            file: "C:\\...\\myTemplateDirectory\\DirB\\myView3.html",
+            name: myView3,
+            cache: []
+        }    
+    }
+
+The "path" identifier ("myTemplateDirectory/DirA/myView1") is always unique in the storage, while the same "name" identifier (name) can occur in multiple registered templates.
+
+If you register a single template, the "path" and the "name" identifier will be the same.
+
+    {
+        "myTemplateDirectory/DirA/myView1" : {
+            file: "C:\\...\\myTemplateDirectory\\DirA\\myView1.html",
+            name: myView1,
+            cache: []
+        },
+        "myTemplateDirectory/DirA/myView2" : {
+            file: "C:\\...\\myTemplateDirectory\\DirA\\myView2.html",
+            name: myView2,
+            cache: []
+        },
+        "myTemplateDirectory/DirB/myView3" : {
+            file: "C:\\...\\myTemplateDirectory\\DirB\\myView3.html",
+            name: myView3,
+            cache: []
+        },  
+        "mySingleTemplate" : {
+            file: "C:\\...\\mySingleTemplate.html",
+            name: mySingleTemplate,
+            cache: []
+        }    
+    }
+
+The "name" identifier will normally be the filename without its extension. When registering a single template you can provide an own identifier, using for instance the function `registerTemplateWithNameSync`.
+You can access your registered templates with both identifiers, using accordant functions:
+
+    var leif = require("leif");
+    var context = {...};
+    var result1 = leif.requestTemplateByName("myView2", context);
+    var result2 = leif.requestTemplateByPath("myTemplateDirectory/DirB/myView3", context);
+
 ##Caching##
 
-Instead of directly translate a template into the final html document, leif can cache your templates in an intermediate form, so that the time it takes to produce your page when you request it, can be minimized.
+Instead of directly requesting a template after registering it, leif can cache your templates in an intermediate form, so that the time for all following requestes can be minimized.
 
 ###intermediate form###
 
@@ -394,119 +489,91 @@ the part in the intermediate form will be change to this:
 
 ###using caching###
 
-You can cache single templates or complete directories of templates.
+Leif normally caches a template on its first request. You can change that behaviour by using the property `cacheTemplatesOnFirstRequest`. You can also manually cache a template by using for instance the function cacheTemplateByPathSync:
 
     var leif = require("leif");
 
-    //single template
-    var err = leif.cacheTemplateSync("C:\\...\\intro.html");
+    //registering
+    leif.registerTemplateSync("C:\\...\\intro.html");
+    //caching
+    leif.cacheTemplateByPathSync("intro");
 
-    //directory
-    var err = leif.cacheDirectorySync("C:\\...\\myTemplateDirectory");
+    .
+    .
+    .
 
-Cached templates will be saved in an internal hierarchical object. Consider the following folder structure in the myTemplateDirectory folder:
+    //requesting
+    leif.requestTemplateByPath("intro", context);
 
-    myTemplateDirectory
-        |
-        +-- DirA
-        |     |
-        |     +-- myView1.html
-        |     |
-        |     +-- myView2.html
-        |
-        |
-        +-- DirB
-        |     |
-        |     +-- myView3.html
-        |
-        |
-        +-- index.html
-
-After caching this directory, the internal template storage will look like this:
-
-    {
-        myTemplateDirectory: {
-            DirA: {
-                myView1: [..indermediate form of myView1.html..],
-                myView2: [..indermediate form of myView2.html..]
-            },
-            DirB: {
-                myView3: [..indermediate form of myView3.html..]
-            },
-            index: [..indermediate form of index.html..]
-        }
-    }
-
-If you cache a single template, it will always be stored at the top level of the template storage.
-
-    {
-        myTemplateDirectory: {
-            DirA: {
-                myView1: [..indermediate form of myView1.html..],
-                myView2: [..indermediate form of myView2.html..]
-            },
-            DirB: {
-                myView3: [..indermediate form of myView3.html..]
-            },
-            index: [..indermediate form of index.html..]
-        },
-        mySingleTemplate: [..indermediate form of mySingleTemplate.html..]
-    }
-
-Each cached template, will be provided with an identifier that is the filename without the extension ".html". When caching a single template you can provide an own identifier, using for instance the function `cacheTemplateWithNameSync`.
-You can access your cached template either with the identifier or with the full path inside the template storage.
-
-    var leif = require("leif");
-    var context = {...};
-    var result1 = leif.requestTemplateByName("myView2", context);
-    var result2 = leif.requestTemplateByPath("myTemplateDirectory.DirB.myView3", context);
-
-By using `requestTemplateByName`, the whole storage will be searched for a template, that has the name, you are requesting. Since the name is not nessecaryly unique, multiple matches may occur. The function `requestTemplateByPath` lets you provide the full path and guarantees thereby, that you match at maximum one template.
-
+Keep in mind that a cached template will not take notice of any changes in the original file. If you change the file of a cached template you have to recache it in order to transfer these changes.
 
 ##API##
 
     var leif = require("leif");
 
-###leif.cacheDirectory(dir, callback)###
+###leif.registerDirectory(dir, callback)###
 
-Saves all the templates within the directory `dir` and all subdirectories in the intermediate form. The name of each template is the filename without the extension ".html". The `callback` gets one argument `(error)`, which is `null` on success.
+Registers all the templates within the directory `dir` and all subdirectories. The name of each template is the filename without the extension ".html". The `callback` gets one argument `(error)`, which is `null` on success.
 
-###leif.cacheDirectorySync(dir)###
+###leif.registerDirectorySync(dir)###
 
-Synchronous version of `cacheDirectory`. Return value is `error`, which is `null` on success.
+Synchronous version of `registerDirectory`. Return value is `error`, which is `null` on success.
 
-###leif.cacheTemplate(file, callback)###
+###leif.registerTemplate(file, callback)###
 
-Saves the template in `file` in the intermediate form. The name of the template is the filename without the extension ".html". The `callback` gets one argument `(error)`, which is `null` on success.
+Registers the template in `file`. The name of the template is the filename without the extension ".html". The `callback` gets one argument `(error)`, which is `null` on success.
 
-###leif.cacheTemplateSync(file)###
+###leif.registerTemplateSync(file)###
 
-Synchronous version of `cacheTemplate`. Return value is `error`, which is `null` on success.
+Synchronous version of `registerTemplate`. Return value is `error`, which is `null` on success.
 
-###leif.cacheTemplateWithName(file, name, callback)###
+###leif.registerTemplateWithName(file, name, callback)###
 
-Saves the template in `file` in the intermediate form. The name of the template is the argument `name`. The `callback` gets one argument `(error)`, which is `null` on success.
+Registers the template in `file`. The name of the template is the argument `name`. The `callback` gets one argument `(error)`, which is `null` on success.
 
-###leif.cacheTemplateWithNameSync(file, name)###
+###leif.registerTemplateWithNameSync(file, name)###
 
-Synchronous version of `cacheTemplateWithName`. Return value is `error`, which is `null` on success.
+Synchronous version of `registerTemplateWithName`. Return value is `error`, which is `null` on success.
 
-###leif.requestTemplateByFile(file, context, callback)###
+###leif.cacheTemplateByName(name, callback)###
 
-Translates the template in `file` immediately, using the `context` object. The `callback` gets two arguments `(error, result)`. `result` is the translated html string.
+Searches the register for a template with the name `name` and caches the templates by parsing the template file and creating the intermediate form. If the template was already cached, the old cache will be overridden. The `callback` gets one argument `(error)`, which is `null` on success.
 
-###leif.requestTemplateByFileSync(file, context)###
+###leif.cacheTemplateByNameSync(name)###
 
-Synchronous version of `requestTemplateByFile`. Returns the `result`, which is `null` on error.
+Synchronous version of `cacheTemplateByName`. Return value is `error`, which is `null` on success.
+
+###leif.cacheTemplateByPath(path, callback)###
+
+Caches the template with the path `path` by parsing the template file and creating the intermediate form. If the template was already cached, the old cache will be overridden. The `callback` gets one argument `(error)`, which is `null` on success.
+
+###leif.cacheTemplateByPathSync(path)###
+
+Synchronous version of `cacheTemplateByPath`. Return value is `error`, which is `null` on success.
+
+###leif.cacheAllTemplates(callback)###
+
+Caches all registered templates. If a template was already cached, the old cache will be overridden. The `callback` gets one argument `(error)`, which is `null` on success.
+
+###leif.cacheAllTemplatesSync()###
+
+Synchronous version of `cacheAllTemplates`. Return value is `error`, which is `null` on success.
 
 ###leif.requestTemplateByName(name, context)###
 
-Synchronous function, that searches all the cached templates for one with the name `name` and translates it using the `context` object. How this function will react on multiple occurances with the same name, is handled by the property `returnFirstTemplateOnMultipleMatches`. Return value is the translated html string or `null` on errors.
+Synchronous function, that searches the register for a template with the name `name` and translates it using the `context` object. If the found template is cached, it will interpret the cache, otherwise it will parse the original file. How this function will react on multiple occurances with the same name is handled by the property `returnFirstTemplateOnMultipleMatches`. Return value is the translated html string or `null` on errors.
 
-###leif.requestTemplateByPath(path, context, delimiter)###
+###leif.requestTemplateByPath(path, context)###
 
-Synchronous function, that finds the template whose path inside the template storage is matched by `path` and translates it using the `context` object. The `path` is a `delimiter` separated string that contains all the identifiers used in the template storage. If no `delimiter` is passed, the property `standardTemplatePathDelimiter` is used instead. Return value is the translated html string or `null` on errors.
+Synchronous function, that translates the template with the path `path` using the `context` object. The `path` is a "/" separated string that contains all the folder names und the template file name up from the directory that was registered ("dirA/dirA/index"). Return value is the translated html string or `null` on errors.
+
+###leif.clearCache()###
+
+Clears the cache for all registered templates. This function has no return value.
+
+###leif.clearRegister()###
+
+Clears the register. This function has no return value.
 
 ###leif.setUserRepository(repo)###
 
@@ -522,19 +589,21 @@ Synchronous function, that sets the user function repository. The argument `repo
 
 ###leif.overrideExistingTemplates###
 
-Boolean property. Defines the behaviour on caching a template with the same path as an template that is already cached. If `true`, the previous template will be overridden. If `false`, the existing template remains and depending on the property `throwErrorOnOverrideExistingTemplates` an error will be returned. Default value is `false`.
-
-###leif.returnFirstTemplateOnMultipleMatches###
-
-Boolean property. Defines the behaviour searching a cached template by its name and finding multiple occurances. If `true`, the first occurance will be returned. If `false`, an error will be returned. Default value is `false`. Be aware that if you use the asynchronous function `cacheDirectory`, there is no guarantee in which order the templates will be saved in the template storage.
-
-###leif.standardTemplatePathDelimiter###
-
-String property. Sets the standard delimiter to use when requesting a template by its path. Default value is `.`.
+Boolean property. Defines the behaviour on registering a template with the same path as an template that is already registered. If `true`, the previous template will be overridden. If `false`, the existing template remains and depending on the property `throwErrorOnOverrideExistingTemplates` an error will be returned. Default value is `false`.
 
 ###leif.throwErrorOnOverrideExistingTemplates###
 
-Boolean property. Defines if an error will be returned, when trying to cache a template with the same path as an template that is already cached. This will only have an effect if the property `overrideExistingTemplates` is set to `false`. Default value is `true`.
+Boolean property. Defines if an error will be returned, when trying to register a template with the same path as an template that is already registered. This will only have an effect if the property `overrideExistingTemplates` is set to `false`. Default value is `true`.
+
+###leif.returnFirstTemplateOnMultipleMatches###
+
+Boolean property. Defines the behaviour when searching a registered template by its name and finding multiple occurances. If `true`, the first occurance will be returned. If `false`, an error will be returned. Default value is `false`. Be aware that if you use the asynchronous function `registerDirectory`, there is no guarantee in which order the templates will be saved in the template storage.
+
+###leif.cacheTemplatesOnFirstRequest###
+
+Boolean property. Defines if leif should automatically cache a template when it is first requested. Default value is `true`.
+
+
 
 
 

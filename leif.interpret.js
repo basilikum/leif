@@ -9,6 +9,8 @@ module.exports = (function (that) {
 		fullFunctionRepository = helper.deepMergeObjects(functionRepository, repo);
 	};
 
+	that.showInlineParsingErrors = true;
+
 	var interpretFunctionArguments = function (args, context, vmcontext) {
 		var evaluatedArgs = [],
 			arg,
@@ -27,9 +29,12 @@ module.exports = (function (that) {
 		return evaluatedArgs;
 	};
 
-	var interpretErrorMessage = function (obj, context, vmcontext) {
-		//return "(" + obj.message + " -->)" + obj.text;
-		return obj.text;
+	var interpretErrorMessage = function (error) {
+		if (that.showInlineParsingErrors) {
+			return "(" + error.message + " -->)";
+		} else {
+			return "";
+		}
 	};
 
 
@@ -115,8 +120,7 @@ module.exports = (function (that) {
 		"eval": interpretEvalStatement,
 		"func": interpretFunction,
 		"foreach": interpretForeachStatement,
-		"if":  interpretIfStatement,
-		"error": interpretErrorMessage
+		"if":  interpretIfStatement
 	};
 
 	var interpretArray = function (arr, context, vmcontext) {
@@ -127,6 +131,8 @@ module.exports = (function (that) {
 			obj = arr[i];
 			if (typeof obj === "string") {
 				result.push(obj);
+			} else if (obj instanceof Error) {
+				result.push(interpretErrorMessage(obj));
 			} else {
 				result.push(interpreter[obj.type](obj, context, vmcontext));
 			}
@@ -136,6 +142,7 @@ module.exports = (function (that) {
 
 
 	that.produceHTML = function (arr, context) {
+		context = context || {};
 		context.$this = context;
 		var res = interpretArray(arr, context, leifEval.createContext(helper.mergeObjects(context, fullFunctionRepository))).join("");
 		return res;

@@ -1,16 +1,17 @@
 var mergeObjects = function (object1, object2) {
 	var result = {},
 		property;
+	for (property in object2) {
+		if (object2.hasOwnProperty(property)) {
+			result[property] = object2[property];
+		}
+	}		
 	for (property in object1) {
 		if (object1.hasOwnProperty(property)) {
 			result[property] = object1[property];
 		}
 	}
-	for (property in object2) {
-		if (object2.hasOwnProperty(property)) {
-			result[property] = object2[property];
-		}
-	}	
+	
 	return result;
 };
 
@@ -156,6 +157,28 @@ var getObjectLength = function (obj) {
 	return counter;
 };
 
+var deepCopy = function (obj) {
+	var out, i, max_i;
+
+    if (Array.isArray(obj)) {
+        out = [];
+        for (i = 0, max_i = obj.length; i < max_i; i++) {
+            out.push(arguments.callee(obj[i]));
+        }
+        return out;
+    }
+    if (typeof obj === 'object') {
+        out = {};
+        for (i in obj) {
+			if (obj.hasOwnProperty(i)) {
+				out[i] = arguments.callee(obj[i]);
+			}
+		}
+        return out;
+    }
+    return obj;
+};
+
 module.exports = {
 	compressArray: compressArray,
 	insertArrayInAnother: insertArrayInAnother,
@@ -163,5 +186,6 @@ module.exports = {
 	findClosingIndex: findClosingIndex,
 	mergeObjects: mergeObjects,
 	deepMergeObjects: deepMergeObjects,
-	getObjectLength: getObjectLength
+	getObjectLength: getObjectLength,
+	deepCopy: deepCopy
 };

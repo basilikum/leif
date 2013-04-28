@@ -119,23 +119,6 @@ module.exports = (function (that) {
 		}
 	};
 
-	var parseTextFunction = function (func, args) {
-		var evaluatedArgs,
-			funcResult,
-			funcResultArray;
-
-		evaluatedArgs = parseFunctionArguments(args);
-		if (evaluatedArgs.evaluated) {
-			return func.apply(this, evaluatedArgs.args);
-		} else {
-			return {
-				type: "text",
-				func: func,
-				args: evaluatedArgs.args
-			};
-		}
-	};
-
 	var getFunctionByName = function (nameOfFunction) {
 		var parts, key, func;
 
@@ -222,12 +205,8 @@ module.exports = (function (that) {
 					}
 					parseFunctionResult = parseStatement(nameOfFunction, args, body);
 					if (parseFunctionResult instanceof Error) {
-						resultArray.push({
-							type: "error",
-							text: match.substring(0, 2),
-							message: parseFunctionResult.message
-							
-						});
+						resultArray.push(parseFunctionResult);
+						resultArray.push(match.substring(0, 2));
 						htmlString = match.substring(2);
 					} else if (Array.isArray(parseFunctionResult)) {
 						resultArray = resultArray.concat(parseFunctionResult);
@@ -235,21 +214,13 @@ module.exports = (function (that) {
 						resultArray.push(parseFunctionResult);
 					}
 				} else {
-					resultArray.push({
-						type: "error",
-						text: match.substring(0, 2),
-						message: "no closing parentheses found"
-						
-					});
+					resultArray.push(new Error("no closing parentheses found"));
+					resultArray.push(match.substring(0, 2));
 					htmlString = match.substring(2);
 				}
 			} else {
-				resultArray.push({
-					type: "error",
-					text: match.substring(0, 2),
-					message: "not a valid expression"
-					
-				});
+				resultArray.push(new Error("not a valid expression"));
+				resultArray.push(match.substring(0, 2));
 				htmlString = match.substring(2);
 			}
 		

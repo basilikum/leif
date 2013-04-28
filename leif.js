@@ -5,9 +5,8 @@ var leif = (function(that){
 		parser = require("./leif.parse.js"),
 		interpreter = require("./leif.interpret.js"),
 		helper = require("./leif.helper.js"),
+		tc = require("./leif.template.js"),
 
-		Template,
-		createTemplate,
 		registerDirectory,
 		registerDirectorySync,
 		registerTemplate,
@@ -28,6 +27,7 @@ var leif = (function(that){
 		requestTemplateByName,
 		requestTemplateByPath,
 		clearCache,
+		clearRegister,
 
 		views = {};
 
@@ -37,16 +37,16 @@ var leif = (function(that){
 	that.overrideExistingTemplates = false;
 	that.throwErrorOnOverrideExistingTemplates = true;
 	that.returnFirstTemplateOnMultipleMatches = false;
-	that.cacheTemplatesOnFirstLoad = true;
+	that.cacheTemplatesOnFirstRequest = true;
 
 	that.registerDirectory = function (dir, callback) {
-		registerDirectory(dir, views, function (err) {
+		registerDirectory(dir, "", function (err) {
 			callback(err);
 		});
 	};
 
 	that.registerDirectorySync = function (dir) {
-		return registerDirectorySync(dir, views);
+		return registerDirectorySync(dir, "");
 	};
 
 	that.registerTemplate = function (file, callback) {
@@ -90,13 +90,13 @@ var leif = (function(that){
 	};
 
 	that.cacheAllTemplates = function (callback) {
-		cacheAllTemplates(views, function (err) {
+		cacheAllTemplates(function (err) {
 			callback(err);
 		});
 	};
 
 	that.cacheAllTemplatesSync = function () {
-		return cacheAllTemplatesSync(views);
+		return cacheAllTemplatesSync();
 	};
 
 	that.requestTemplateByName = function (name, context) {
@@ -108,50 +108,37 @@ var leif = (function(that){
 	};
 
 	that.clearCache = function () {
-		clearCache(views);
+		clearCache();
 	};
+
+	that.clearRegister = function () {
+		clearRegister();
+	};	
 
 	that.setUserRepository = function (repo) {
 		parser.setUserRepository(repo);
 		interpreter.setUserRepository(repo);
 	};
 
-
-	//Template class
-
-	Template = function (){};
-
-	Template.prototype = {
-		file: null,
-		cache: null,
-		watched: false,
-		init: function (file) {
-			this.file = file;
-			return this;
-		},
-		watch: function () {
-
-		}
-	};
-
-	createTemplate = function (file) {
-		var t = new Template();
-		return t.init(file);
+	that.__returnTemplates = function () {
+		return helper.deepCopy(views);
 	};
 
 
 	//Functions
 
-	registerDirectory = function (dir, obj, callback) {
+	registerDirectory = function (dir, templatePath, callback) {
+
+		if (typeof templatePath !== "string") {
+			templatePath = "";
+		}	
 		fs.stat(dir, function (err, stats) {
 			var folderName;
 			if (err) {
 				callback(err);
 			} else if (stats.isDirectory()) {
 				folderName = path.basename(dir);
-				if (!obj[folderName]) {
-					obj[folderName] = {};
-				}
+				templatePath += folderName + "/";
 				fs.readdir(dir, function (err, files) {
 					var file, i, max_i = files.length,
 						totalError = "",
@@ -171,21 +158,24 @@ var leif = (function(that){
 						file = dir + "/" + files[i];
 						(function (file) {
 							fs.stat(file, function (err, stats) {
-								var viewName;
+								var templateName,
+									tpath;
+
 								if (err) {
 									incrementCounter(err);
 								} else if (stats.isDirectory()) {
-									registerDirectory(file, function (err) {
+									registerDirectory(file, templatePath, function (err) {
 										incrementCounter(err);
-									}, obj[folderName]);
+									});
 								} else if (stats.isFile()) {
 									if (path.extname(file) === ".html") {
-										viewName = path.basename(file, '.html');
-										if (that.overrideExistingTemplates || !obj[folderName][viewName]) {
-											obj[folderName][viewName] = createTemplate(file);
+										templateName = path.basename(file, '.html');
+										tpath = templatePath + templateName;
+										if (that.overrideExistingTemplates || !views[tpath]) {
+											views[tpath] = tc.createTemplate(file, templateName);
 											incrementCounter();
 										} else if (that.throwErrorOnOverrideExistingTemplates) {
-											incrementCounter("template " + dir + "/" + viewName + " is already registered");
+											incrementCounter("a template with the path " + tpath + " is already registered");
 										} else {
 											incrementCounter();
 										}						
@@ -205,40 +195,42 @@ var leif = (function(that){
 		});
 	};
 
-	registerDirectorySync = function (dir, obj) {
+	registerDirectorySync = function (dir, templatePath) {
 		var dirStat,
 			fileStat,
 			folderName,
 			files, file,
 			subDirResult,
 			data,
-			viewName,
+			templateName,
+			tpath,
 			error = "",
 			i, max_i;
+
+		if (typeof templatePath !== "string") {
+			templatePath = "";
+		}	
 
 		dirStat = fs.statSync(dir);
 
 		if (dirStat.isDirectory()) {
 			folderName = path.basename(dir);
-
-			if (!obj[folderName]) {
-				obj[folderName] = {};
-			}
-			obj = obj[folderName];
+			templatePath += folderName + "/";
 			files = fs.readdirSync(dir);
 			for (i = 0, max_i = files.length; i < max_i; i++) {
 				file = dir + "/" + files[i];
 				fileStat = fs.statSync(file);
 				if (fileStat.isDirectory()) {
-					subDirResult = registerDirectorySync(file, obj);
+					subDirResult = registerDirectorySync(file, templatePath);
 					error += (subDirResult instanceof Error) ? subDirResult.message : "";
 				} else if (fileStat.isFile()) {
 					if (path.extname(file) === ".html") {
-						viewName = path.basename(file, '.html');
-						if (that.overrideExistingTemplates || !obj[viewName]) {
-							obj[viewName] = createTemplate(file);
+						templateName = path.basename(file, '.html');
+						tpath = templatePath + templateName;
+						if (that.overrideExistingTemplates || !views[tpath]) {
+							views[tpath] = tc.createTemplate(file, templateName);
 						} else if (that.throwErrorOnOverrideExistingTemplates) {
-							error += "template " + dir + "/" + viewName + " is already registered\r\n";
+							error += "a template with the path " + tpath + " is already registered\r\n";
 						}
 					}
 				}
@@ -252,8 +244,14 @@ var leif = (function(that){
 	registerTemplate = function (file, name, callback) {
 		fs.exists(file, function (exists) {
 			if (exists) {
-				views[name] = createTemplate(file);
-				callback();
+				if (that.overrideExistingTemplates || !views[name]) {
+					views[name] = tc.createTemplate(file, name);
+					callback(null);
+				} else if (that.throwErrorOnOverrideExistingTemplates) {
+					callback(new Error("a template with the path " + name + " is already registered"));
+				} else {
+					callback(null);
+				}
 			} else {
 				callback(new Error("file " + file + " does not exist!"));
 			}
@@ -265,26 +263,28 @@ var leif = (function(that){
 
 		exists = fs.existsSync(file);
 		if (exists) {
-			views[name] = createTemplate(file);
-			return null;
+			if (that.overrideExistingTemplates || !views[name]) {
+				views[name] = tc.createTemplate(file, name);
+				return null;
+			} else if (that.throwErrorOnOverrideExistingTemplates) {
+				return new Error( "a template with the path " + name + " is already registered");
+			} else {
+				return null;
+			}
 		} else {
 			return new Error("file " + file + " does not exist!");
 		}					
 	};		
 
-	getTemplatesByName = function (obj, searchKey) {
+	getTemplatesByName = function (name) {
 		var result = [],
 			key, item;
 
-		for (key in obj) {
-			if (obj.hasOwnProperty(key)) {
-				item = obj[key];
-				if (item instanceof Template) {
-					if (searchKey === key) {
-						result.push(item);
-					}
-				} else if (typeof item === "object") {
-					result = result.concat(getTemplatesByName(item, searchKey));
+		for (key in views) {
+			if (views.hasOwnProperty(key)) {
+				item = views[key];
+				if (item.name === name) {
+					result.push(item);
 				}
 			}
 		}
@@ -292,19 +292,14 @@ var leif = (function(that){
 	};		
 
 	getTemplateByPath = function (path) {
-		var parts, i, max_i, part, obj;
+		var key;
 
-		obj = views;
-		parts = path.split("/");
-		for (i = 0, max_i = parts.length; i < max_i; i++) {
-			part = parts[i];
-			obj = (typeof obj === "object") ? obj[part] : undefined;
+		for (key in views) {
+			if (views.hasOwnProperty(key) && key === path) {
+				return views[key];
+			}
 		}
-		if (obj instanceof Template) {
-			return obj;
-		} else {
-			return new Error("there is no template with the path " + path + " registered!");
-		}	
+		return new Error("there is no template with the path " + path + " registered!");
 	};
 
 	parseTemplate = function (template, callback) {
@@ -343,20 +338,15 @@ var leif = (function(that){
 	cacheTemplateByName = function (name, callback) {
 		var foundTemplates, template;
 
-		foundTemplates = getTemplatesByName(views, name);
+		foundTemplates = getTemplatesByName(name);
 		if (foundTemplates.length === 0) {
 			callback(new Error("no template with the name " + name + " found!"));
 		} else if (foundTemplates.length > 1 && !that.returnFirstTemplateOnMultipleMatches) {
 			callback(new Error("too many templates with the name " + name + " found!"));
 		} else {
 			template = foundTemplates[0];
-			fs.readFile(template.file, function (error, data) {
-				if (error) {
-					callback(error);
-				} else {
-					template.cache = parser.parse(data.toString());	
-					callback();				
-				}
+			cacheTemplate(template, function (err) {
+				callback(err);
 			});
 		}
 	};	
@@ -364,16 +354,14 @@ var leif = (function(that){
 	cacheTemplateByNameSync = function (name) {
 		var foundTemplates, template, data;
 
-		foundTemplates = getTemplatesByName(views, name);
-		if (foundViews.length === 0) {
+		foundTemplates = getTemplatesByName(name);
+		if (foundTemplates.length === 0) {
 			return new Error("no template with the name " + name + " found!");
-		} else if (foundViews.length > 1 && !that.returnFirstTemplateOnMultipleMatches) {
+		} else if (foundTemplates.length > 1 && !that.returnFirstTemplateOnMultipleMatches) {
 			return new Error("too many templates with the name " + name + " found!");
 		} else {
 			template = foundTemplates[0];
-			data = fs.readFileSync(template.file);
-			template.cache = parser.parse(data.toString());	
-			return null;
+			return cacheTemplateSync(template);	
 		}
 	};		
 
@@ -382,10 +370,10 @@ var leif = (function(that){
 
 		template = getTemplateByPath(path);
 		if (template instanceof Error) {
-			return template;
+			callback(template);
 		} else {
-			cacheTemplate(template, function (error) {
-				callback(error);
+			cacheTemplate(template, function (err) {
+				callback(err);
 			});
 		}
 	};	
@@ -401,10 +389,10 @@ var leif = (function(that){
 		}
 	};	
 
-	cacheAllTemplates = function (obj, callback) {
-		var key, item, counter, decrementCounter, errors = [];
+	cacheAllTemplates = function (callback) {
+		var key, counter, decrementCounter, errors = [];
 
-		counter = helper.getObjectLength(obj);
+		counter = helper.getObjectLength(views);
 		decrementCounter = function (err) {
 			if (err instanceof Error) {
 				errors.push(err.message);
@@ -414,30 +402,19 @@ var leif = (function(that){
 				callback(errors.length > 0 ? errors.join("\r\n") : null);
 			}
 		};
-		for (key in obj) {
-			if (obj.hasOwnProperty(key)) {
-				item = obj[key];
-				if (item instanceof Template) {
-					cacheTemplate(item, decrementCounter);
-				} else if (typeof item === "object") {
-					cacheAllTemplates(item, decrementCounter);
-				}
+		for (key in views) {
+			if (views.hasOwnProperty(key)) {
+				cacheTemplate(views[key], decrementCounter);
 			}
 		}
 	};
 
-	cacheAllTemplatesSync = function (obj) {
-		var key, item, result, errors = [];
+	cacheAllTemplatesSync = function () {
+		var key, result, errors = [];
 
-		for (key in obj) {
-			if (obj.hasOwnProperty(key)) {
-				item = obj[key];
-				result = null;
-				if (item instanceof Template) {
-					result = cacheTemplateSync(item);
-				} else if (typeof item === "object") {
-					result = cacheAllTemplatesSync(item);
-				}
+		for (key in views) {
+			if (views.hasOwnProperty(key)) {
+				result = cacheTemplateSync(views[key]);
 				if (result instanceof Error) {
 					error.push(result.message);
 				}
@@ -453,7 +430,7 @@ var leif = (function(that){
 		cache = template.cache;
 		if (cache === null) {
 			cache = parseTemplateSync(template);
-			if (that.cacheTemplatesOnFirstLoad) {
+			if (that.cacheTemplatesOnFirstRequest) {
 				template.cache = cache;
 			}
 		}
@@ -463,7 +440,7 @@ var leif = (function(that){
 	requestTemplateByName = function (name, context) {
 		var foundTemplates, template;
 
-		foundTemplates = getTemplatesByName(views, name);
+		foundTemplates = getTemplatesByName(name);
 		if (foundTemplates.length === 0) {
 			return new Error("no template with the name " + name + " found!");
 		} else if (foundTemplates.length > 1 && !that.returnFirstTemplateOnMultipleMatches) {
@@ -485,20 +462,19 @@ var leif = (function(that){
 		}
 	};
 
-	clearCache = function (obj) {
-		var key, item;
+	clearCache = function () {
+		var key;
 
-		for (key in obj) {
-			if (obj.hasOwnProperty(key)) {
-				item = obj[key];
-				if (item instanceof Template) {
-					item.cache = null;
-				} else if (typeof item === "object") {
-					clearCache(item);
-				}
+		for (key in views) {
+			if (views.hasOwnProperty(key)) {
+				views[key].cache = null;
 			}
 		}
 	};	
+
+	clearRegister = function () {
+		views = {};
+	};
 
 	return that;
 }({}));
