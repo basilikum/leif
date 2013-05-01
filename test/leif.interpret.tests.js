@@ -40,25 +40,55 @@ suite("When interpreting", function () {
 		test("can handle true statement", function () {
 			var actual, expected;
 
-			actual = interpreter.produceHTML(["before", {type: "if", condition: "item === '!'", body: ["middle"]}, "after"], context);
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '!'", body: ["middle"]}]}, "after"], context);
 			expected = "beforemiddleafter";
 			assert.strictEqual(actual, expected);
 		});	
 		test("can handle false statement", function () {
 			var actual, expected;
 
-			actual = interpreter.produceHTML(["before", {type: "if", condition: "item === '?'", body: ["middle"]}, "after"], context);
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '?'", body: ["middle"]}]}, "after"], context);
 			expected = "beforeafter";
 			assert.strictEqual(actual, expected);
 		});	
 		test("can handle not evaluable statement", function () {
 			var actual, expected;
 
-			actual = interpreter.produceHTML(["before", {type: "if", condition: "item ==!= '!'", body: ["middle"]}, "after"], context);
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item ==!= '!'", body: ["middle"]}]}, "after"], context);
 			expected = "beforeafter";
 			assert.strictEqual(actual, expected);
 		});	
 	});
+	suite("if/elseif/else statement", function () {
+		test("can handle when first true statement is if", function () {
+			var actual, expected;
+
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '!'", body: ["if"]},{type: "if", condition: "item === '?'", body: ["elseif"]},["else"]]}, "after"], context);
+			expected = "beforeifafter";
+			assert.strictEqual(actual, expected);
+		});			
+		test("can handle when first true statement is elseif", function () {
+			var actual, expected;
+
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '?'", body: ["if"]},{type: "if", condition: "item === '!'", body: ["elseif"]},["else"]]}, "after"], context);
+			expected = "beforeelseifafter";
+			assert.strictEqual(actual, expected);
+		});	
+		test("can handle when no statement is true (with else)", function () {
+			var actual, expected;
+
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '?'", body: ["if"]},{type: "if", condition: "item === '&'", body: ["elseif"]},["else"]]}, "after"], context);
+			expected = "beforeelseafter";
+			assert.strictEqual(actual, expected);
+		});	
+		test("can handle when no statement is true (without else)", function () {
+			var actual, expected;
+
+			actual = interpreter.produceHTML(["before", {type:"if", blocks: [{type: "if", condition: "item === '?'", body: ["if"]},{type: "if", condition: "item === '&'", body: ["elseif"]}]}, "after"], context);
+			expected = "beforeafter";
+			assert.strictEqual(actual, expected);
+		});			
+	});	
 	suite("foreach statement", function () {
 		test("can iterate over objects in array", function () {
 			var actual, expected;

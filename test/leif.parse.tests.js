@@ -47,16 +47,51 @@ suite("when parsing", function () {
 				var actual, expected;
 
 				actual = parser.parse("before$:if(variableName){middle}after");
-				expected = ["before",{type:"if",condition:"variableName",body:["middle"]},"after"];
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"variableName",body:["middle"]}]},"after"];
 				assert.deepEqual(actual, expected);
 			});	
 			test("does not directly evaluate expression with typeof operator", function () {
 				var actual, expected;
 
 				actual = parser.parse("before$:if(typeof 'fg' === 'string'){middle}after");
-				expected = ["before",{type:"if",condition:"typeof 'fg' === 'string'",body:["middle"]},"after"];
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"typeof 'fg' === 'string'",body:["middle"]}]},"after"];
 				assert.deepEqual(actual, expected);
-			});					
+			});	
+			test("can create object of type 'if/else' when not evaluable", function () {
+				var actual, expected;
+
+				actual = parser.parse("before$:if(variableName){middle} $:else{!}after");
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"variableName",body:["middle"]},["!"]]},"after"];
+				assert.deepEqual(actual, expected);
+			});				
+			test("can create object of type 'if/elseif/else' when elseif is evaluable", function () {
+				var actual, expected;
+
+				actual = parser.parse("before$:if(variableName){middle} $:elseif(true){yes} $:else{!}after");
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"variableName",body:["middle"]}, ["yes"]]},"after"];
+				assert.deepEqual(actual, expected);
+			});	
+			test("can create object of type 'if/elseif/else' when elseif is not evaluable", function () {
+				var actual, expected;
+
+				actual = parser.parse("before$:if(variableName){middle} $:elseif(otherVariable){yes} $:else{!}after");
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"variableName",body:["middle"]}, {type:"if",condition:"otherVariable",body:["yes"]}, ["!"]]},"after"];
+				assert.deepEqual(actual, expected);
+			});	
+			test("can create object of type 'if/elseif/else' when if is false", function () {
+				var actual, expected;
+
+				actual = parser.parse("before$:if(false){middle} $:elseif(otherVariable){yes} $:else{!}after");
+				expected = ["before",{type:"if", blocks: [{type:"if",condition:"otherVariable",body:["yes"]}, ["!"]]},"after"];
+				assert.deepEqual(actual, expected);
+			});							
+			test("can directly evaluate 'if/elseif/else' statement", function () {
+				var actual, expected;
+
+				actual = parser.parse("before$:if(false){middle} $:elseif(true){yes} $:else{!}after");
+				expected = ["beforeyesafter"];
+				assert.deepEqual(actual, expected);
+			});												
 		});
 		suite("foreach statement", function () {
 			test("creates object of type 'foreach' even if evaluable", function () {
@@ -106,40 +141,82 @@ suite("when parsing", function () {
 		});
 	});
 	suite("non-valid statements", function () {
-		test("can handle missing opening parentheses.", function () {
+		test("can handle missing arguments in function", function () {
 			var actual, expected;
 
 			actual = parser.parse("before$:test");
-			expected = ["before", new Error("not a valid expression"), "$:test"];
+			expected = ["before", new Error(), "$:test"];
 			assert.deepEqual(actual, expected);
 		});
+		test("can handle missing arguments in if statement", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if{test}");
+			expected = ["before", new Error(), "$:if{test}"];
+			assert.deepEqual(actual, expected);
+		});	
+		test("can handle missing arguments in elseif statement with non evaluable if", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if(variableName){test}$:elseif{that}after");
+			expected = ["before", new Error(), "$:if(variableName){test}$:elseif{that}after"];
+			assert.deepEqual(actual, expected);
+		});
+		test("can handle missing arguments in elseif statement with true if", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if(true){test}$:elseif{that}after");
+			expected = ["beforetestafter"];
+			assert.deepEqual(actual, expected);
+		});	
+		test("can handle missing arguments in elseif statement with false if", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if(false){test}$:elseif{that}after");
+			expected = ["before", new Error(), "$:if(false){test}$:elseif{that}after"];
+			assert.deepEqual(actual, expected);
+		});									
 		test("can handle missing closing parentheses.", function () {
 			var actual, expected;
 
 			actual = parser.parse("before$:('mid' + 'dle'after");
-			expected = ["before", new Error("no closing parentheses found") ,"$:('mid' + 'dle'after"];
+			expected = ["before", new Error() ,"$:('mid' + 'dle'after"];
 			assert.deepEqual(actual, expected);
 		});	
 		test("can handle unknown function.", function () {
 			var actual, expected;
 
 			actual = parser.parse("before$:dgfj3t('mid', 'dle')after");
-			expected = ["before", new Error("could not find function with name dgfj3t") ,"$:dgfj3t('mid', 'dle')after"];
+			expected = ["before", new Error() ,"$:dgfj3t('mid', 'dle')after"];
 			assert.deepEqual(actual, expected);
 		});		
 		test("can handle misplaced space in evaluation.", function () {
 			var actual, expected;
 
 			actual = parser.parse("before$: ('mid' + 'dle')after");
-			expected = ["before", new Error("not a valid expression") ,"$: ('mid' + 'dle')after"];
+			expected = ["before", new Error() ,"$: ('mid' + 'dle')after"];
 			assert.deepEqual(actual, expected);
 		});		
 		test("can handle misplaced space in function.", function () {
 			var actual, expected;
 
 			actual = parser.parse("before$:test ('mid' + 'dle')after");
-			expected = ["before", new Error("not a valid expression") ,"$:test ('mid' + 'dle')after"];
+			expected = ["before", new Error() ,"$:test ('mid' + 'dle')after"];
 			assert.deepEqual(actual, expected);
-		});					
+		});		
+		test("can handle wrongly placed 'elseif' statement in evaluable if statement", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if(false){middle} $:else{!} $:elseif(true){yes}after");
+			expected = ["before! ", new Error(), "$:elseif(true){yes}after"];
+			assert.deepEqual(actual, expected);
+		});
+		test("can handle wrongly placed 'elseif' statement in non-evaluable if statement", function () {
+			var actual, expected;
+
+			actual = parser.parse("before$:if(variableName){middle} $:else{!} $:elseif(true){yes}after");
+			expected = ["before", {type:"if", blocks: [{type:"if",condition:"variableName",body:["middle"]}, ["!"]]}, " ", new Error(), "$:elseif(true){yes}after"];
+			assert.deepEqual(actual, expected);
+		});							
 	});	
 });
