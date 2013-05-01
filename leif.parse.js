@@ -292,6 +292,7 @@ module.exports = (function (that) {
 		}
 	};
 
+
 	var parseCodeBlock = function (htmlString) {
 		var matches, match, matchIndex, afterMatch, beforeMatch,
 			contructResult,
