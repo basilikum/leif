@@ -56,14 +56,24 @@ module.exports = (function (that) {
 	};
 
 	var interpretIfStatement = function (obj, context, vmcontext) {
-		var evalResult;
+		var evalResult,
+			block,
+			i, max_i,
+			blocks;
 
-		evalResult = tryEvaluate(obj.condition, context, vmcontext);
-		if (evalResult.evaluated && evalResult.result) {
-			return interpretArray(obj.body, context, vmcontext).join("");
-		} else {
-			return "";
+		blocks = obj.blocks;
+		for (i = 0, max_i = blocks.length; i < max_i; i++) {
+			block = blocks[i];
+			if (block.type === "if") {
+				evalResult = tryEvaluate(block.condition, context, vmcontext);
+				if (evalResult.evaluated && evalResult.result) {
+					return interpretArray(block.body, context, vmcontext).join("");
+				}
+			} else {
+				return interpretArray(block, context, vmcontext).join("");
+			}
 		}
+		return "";
 	};
 
 

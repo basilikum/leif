@@ -558,7 +558,7 @@ suite("When requesting", function () {
 		test("can cache template on first request (when enabled)", function () {
 			var result, template, expected;
 
-			leif.cacheTemplatesOnFirstLoad = true;
+			leif.cacheTemplatesOnFirstRequest = true;
 			leif.requestTemplateByName("f5");
 			template = leif.__returnTemplates()["fs/d1/d4/f5"];
 			expected = tc.createTemplate(__dirname + "/fs/d1/d4/f5.html", "f5");
@@ -568,7 +568,7 @@ suite("When requesting", function () {
 		test("doesn't cache template on first request (when disabled)", function () {
 			var result, template, expected;
 
-			leif.cacheTemplatesOnFirstLoad = false;
+			leif.cacheTemplatesOnFirstRequest = false;
 			leif.requestTemplateByName("f5");
 			template = leif.__returnTemplates()["fs/d1/d4/f5"];
 			expected = tc.createTemplate(__dirname + "/fs/d1/d4/f5.html", "f5");
